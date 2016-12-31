@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
+import java.time.Instant;
 
 /**
  * Created by sg on 26/12/16.
@@ -16,6 +17,11 @@ public class LocatorStatus implements Serializable {
     private String heartBeatRate;
     private String baseStationCode;
     private String baseStationFirmware;
+    private Instant timestamp;
+
+    public LocatorStatus() {
+        this.timestamp = Instant.now();
+    }
 
     @JsonProperty("BA")
     public String getBaseAddress() {
@@ -62,12 +68,18 @@ public class LocatorStatus implements Serializable {
         this.baseStationFirmware = baseStationFirmware;
     }
 
+    @JsonProperty("timestamp")
+    public Instant getTimestamp() {
+        return timestamp;
+    }
+
     public String toString() {
         return "LocatorStatus{ baseAddress=" + baseAddress
             + ", packetType=" + packetType
             + ", heartBeatRate=" + heartBeatRate
             + ", baseStationCode=" + baseStationCode
             + ", baseStationFirmware=" + baseStationFirmware
+            + ", timestamp=" + timestamp
             + " }";
     }
 }

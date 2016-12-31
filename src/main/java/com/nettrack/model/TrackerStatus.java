@@ -4,6 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
+import java.time.Instant;
 
 /**
  * Created by sg on 26/12/16.
@@ -18,6 +19,11 @@ public class TrackerStatus implements Serializable {
     private String signalStrength;
     private String broadcastInterval;
     private String packetNumber;
+    private Instant timestamp;
+
+    public TrackerStatus() {
+        this.timestamp = Instant.now();
+    }
 
     @JsonProperty("CA")
     public String getCardAddress() {
@@ -82,6 +88,10 @@ public class TrackerStatus implements Serializable {
         this.packetNumber = packetNumber;
     }
 
+    @JsonProperty("timestamp")
+    public Instant getTimestamp() {
+        return timestamp;
+    }
 
     public String toString() {
         return "TrackerStatus{ cardAddress=" + cardAddress
@@ -91,6 +101,7 @@ public class TrackerStatus implements Serializable {
             + ", signalStrength=" + signalStrength
             + ", broadcastInterval=" + broadcastInterval
             + ", packetNumber=" + packetNumber
+            + ", timestamp=" + timestamp
             + " }";
     }
 }

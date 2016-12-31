@@ -1,8 +1,10 @@
 package com.nettrack.server;
 
 import com.nettrack.model.LocatorStatus;
-import com.nettrack.model.TrackerStatus;
-import java.util.Objects;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.stereotype.Service;
@@ -14,15 +16,13 @@ import org.springframework.stereotype.Service;
 public class LocatorService {
     private static final Logger LOG = LoggerFactory.getLogger(LocatorService.class);
 
-    public void processMessage(String message) {
-        LOG.error("Unsupported message type: " + message);
+    private Map<String, LocatorStatus> locatorStatuses = new HashMap<>();
+
+    public void process(LocatorStatus locatorStatus) {
+        locatorStatuses.put(locatorStatus.getBaseAddress(), locatorStatus);
     }
 
-    public void processLocatorStatus(LocatorStatus locatorStatus) {
-        LOG.info(Objects.toString(locatorStatus));
-    }
-
-    public void processTrackerStatus(TrackerStatus trackerStatus) {
-        LOG.info(Objects.toString(trackerStatus));
+    public Set<LocatorStatus> getLocatorStatuses() {
+        return locatorStatuses.values().stream().collect(Collectors.toSet());
     }
 }

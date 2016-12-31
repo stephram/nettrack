@@ -23,7 +23,7 @@
     </camel:camelContext>
 
     <!-- ================================== -->
-    <!-- Define netty  codecs               -->
+    <!-- Define netty codecs               -->
     <!-- ================================== -->
     <!-- ChannelBuffer/ByteBuf to String -->
     <bean id="stringDecoder" class="org.jboss.netty.handler.codec.string.StringDecoder"/>
