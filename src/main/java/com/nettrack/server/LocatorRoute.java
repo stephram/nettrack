@@ -56,12 +56,16 @@ public class LocatorRoute extends RouteBuilder {
                     .unmarshal().json(JsonLibrary.Jackson, LocatorStatus.class)
                     .to("bean:locatorService")
                     .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
-//                    .to("websocket://locators")
+                    .process(exchange -> exchange.getIn().setBody(locatorService.getLocatorStatuses()))
+                    .marshal().json(JsonLibrary.Jackson, Set.class)
+                    .to("websocket://locators")
                 .when(bodyAs(String.class).startsWith("{\"CA\""))
                     .unmarshal().json(JsonLibrary.Jackson, TrackerStatus.class)
                     .to("bean:trackerService")
                     .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
-//                    .to("websocket://trackers")
+                    .process(exchange -> exchange.getIn().setBody(trackerService.getTrackerStatuses()))
+                    .marshal().json(JsonLibrary.Jackson, Set.class)
+                    .to("websocket://trackers")
                 .otherwise()
                     .log("Unhandled message: ${body}")
             .endChoice()
@@ -70,9 +74,7 @@ public class LocatorRoute extends RouteBuilder {
         from("timer:status")
             .routeId("endpoints")
             .bean(health, "invoke")
-//            .log("/health : ${body}")
             .bean(metrics, "invoke")
-//            .log("/metrics : ${body}")
         .end();
 
         from("websocket://trackers")
@@ -84,7 +86,7 @@ public class LocatorRoute extends RouteBuilder {
             .end()
             .process(exchange -> exchange.getIn().setBody(trackerService.getTrackerStatuses()))
             .marshal().json(JsonLibrary.Jackson, Set.class)
-            .log("${body}")
+            .log("trackers websocket >>> ${body}")
             .to("websocket://trackers")
         .end();
 
