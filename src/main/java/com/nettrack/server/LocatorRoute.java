@@ -2,7 +2,10 @@ package com.nettrack.server;
 
 import com.nettrack.model.LocatorStatus;
 import com.nettrack.model.TrackerStatus;
+import java.time.Instant;
+import java.util.List;
 import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.camel.Exchange;
 import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.websocket.WebsocketConstants;
@@ -50,7 +53,6 @@ public class LocatorRoute extends RouteBuilder {
                     exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
                 .handled(true)
             .end()
-            .log("${body}")
             .choice()
                 .when(bodyAs(String.class).startsWith("{\"BA\""))
                     .unmarshal().json(JsonLibrary.Jackson, LocatorStatus.class)
@@ -73,8 +75,23 @@ public class LocatorRoute extends RouteBuilder {
 
         from("timer:status")
             .routeId("endpoints")
-            .bean(health, "invoke")
-            .bean(metrics, "invoke")
+            .process(exchange -> {
+                LOG.info("");
+                final List<LocatorStatus> locatorStatusList = locatorService.getLocatorStatuses().stream().collect(Collectors.toList());
+                locatorStatusList.sort((ns1, ns2) -> ns1.getBaseStationCode().compareTo(ns2.getBaseStationCode()));
+                locatorStatusList.forEach(locatorStatus -> {
+                    LOG.info(locatorStatus.getBaseAddress());
+                    locatorStatus.getTrackers().forEach((trackerAddress, trackerStatus) -> {
+                        if(Instant.now().minusSeconds(30).isBefore(trackerStatus.getTimestamp())) {
+                            LOG.info(String.format("    CA: %s, RSSI: %s, TS: %s, BATT: %s",
+                                trackerStatus.getCardAddress(),
+                                trackerStatus.getSignalStrength(),
+                                trackerStatus.getTimestamp(),
+                                trackerStatus.getBatteryPercentage()));
+                        }
+                    });
+                });
+            })
         .end();
 
         from("websocket://trackers")
@@ -86,7 +103,7 @@ public class LocatorRoute extends RouteBuilder {
             .end()
             .process(exchange -> exchange.getIn().setBody(trackerService.getTrackerStatuses()))
             .marshal().json(JsonLibrary.Jackson, Set.class)
-            .log("trackers websocket >>> ${body}")
+            .log("${body}")
             .to("websocket://trackers")
         .end();
 

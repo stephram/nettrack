@@ -5,6 +5,9 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
 import java.time.Instant;
+import java.util.Collections;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  * Created by sg on 26/12/16.
@@ -19,8 +22,19 @@ public class LocatorStatus implements Serializable {
     private String baseStationFirmware;
     private Instant timestamp;
 
+    private Map<String, TrackerStatus> trackerStatuses = new HashMap<>();
+
+
     public LocatorStatus() {
         this.timestamp = Instant.now();
+    }
+
+    public void addTracker(TrackerStatus trackerStatus) {
+        trackerStatuses.put(trackerStatus.getCardAddress(), trackerStatus);
+    }
+
+    public Map<String, TrackerStatus> getTrackers() {
+        return Collections.unmodifiableMap(trackerStatuses);
     }
 
     @JsonProperty("BA")
