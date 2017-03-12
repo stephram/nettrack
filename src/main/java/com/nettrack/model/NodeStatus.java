@@ -14,7 +14,7 @@ import java.util.Map;
  */
 @JsonInclude(JsonInclude.Include.NON_NULL)
 @JsonIgnoreProperties(ignoreUnknown = true)
-public class LocatorStatus implements Serializable {
+public class NodeStatus implements Serializable {
     private String baseAddress;
     private String packetType;
     private String heartBeatRate;
@@ -25,7 +25,7 @@ public class LocatorStatus implements Serializable {
     private Map<String, TrackerStatus> trackerStatuses = new HashMap<>();
 
 
-    public LocatorStatus() {
+    public NodeStatus() {
         this.timestamp = Instant.now();
     }
 
@@ -88,7 +88,7 @@ public class LocatorStatus implements Serializable {
     }
 
     public String toString() {
-        return "LocatorStatus{ baseAddress=" + baseAddress
+        return "NodeStatus{ baseAddress=" + baseAddress
             + ", packetType=" + packetType
             + ", heartBeatRate=" + heartBeatRate
             + ", baseStationCode=" + baseStationCode

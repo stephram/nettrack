@@ -1,6 +1,6 @@
 package com.nettrack.server;
 
-import com.nettrack.model.LocatorStatus;
+import com.nettrack.model.NodeStatus;
 import com.nettrack.model.TrackerStatus;
 import org.apache.camel.Exchange;
 import org.apache.camel.component.websocket.WebsocketConstants;
@@ -9,9 +9,7 @@ import org.apache.camel.spring.boot.FatJarRouter;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.endpoint.HealthEndpoint;
-import org.springframework.boot.actuate.endpoint.InfoEndpoint;
-import org.springframework.boot.actuate.endpoint.MetricsEndpoint;
+import org.springframework.boot.actuate.endpoint.*;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
 
 import java.time.Instant;
@@ -33,13 +31,22 @@ public class NodeRoutes extends FatJarRouter {
   private MetricsEndpoint metrics;
 
   @Autowired
-  private LocatorService locatorService;
+  private InfoEndpoint info;
+
+  @Autowired
+  private EnvironmentEndpoint environmentEndpoint;
+
+  @Autowired
+  private BeansEndpoint beansEndpoint;
+
+  @Autowired
+  private DumpEndpoint dumpEndpoint;
+
+  @Autowired
+  private NodeService nodeService;
 
   @Autowired
   private TrackerService trackerService;
-
-  @Autowired
-  private InfoEndpoint info;
 
   @Override
   public void configure() throws Exception {
@@ -47,18 +54,18 @@ public class NodeRoutes extends FatJarRouter {
     from("netty:tcp://0.0.0.0:8081?sync=false&allowDefaultCodec=false")
       .routeId("locatorRoute")
       .onException(Exception.class)
-      .process(exchange -> LOG.error("Error while receiving Locator message.",
-        exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
-      .handled(true)
+        .process(exchange -> LOG.error("Error while receiving Locator message.",
+          exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
+        .handled(true)
       .end()
       .choice()
         .when(bodyAs(String.class).startsWith("{\"BA\""))
-          .unmarshal().json(JsonLibrary.Jackson, LocatorStatus.class)
+          .unmarshal().json(JsonLibrary.Jackson, NodeStatus.class)
           .to("bean:locatorService")
           .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
-          .process(exchange -> exchange.getIn().setBody(locatorService.getLocatorStatuses()))
+          .process(exchange -> exchange.getIn().setBody(nodeService.getNodeStatusMap()))
           .marshal().json(JsonLibrary.Jackson, Set.class)
-          .to("websocket://locators")
+          .to("websocket://nodes")
         .when(bodyAs(String.class).startsWith("{\"CA\""))
           .unmarshal().json(JsonLibrary.Jackson, TrackerStatus.class)
           .to("bean:trackerService")
@@ -71,15 +78,15 @@ public class NodeRoutes extends FatJarRouter {
         .endChoice()
       .end();
 
-    from("timer:status")
-      .routeId("endpoints")
+    from("timer:nodeStatus")
+      .routeId("nodeStatus")
       .process(exchange -> {
         LOG.info("");
-        final List<LocatorStatus> locatorStatusList = locatorService.getLocatorStatuses().stream().collect(Collectors.toList());
-        locatorStatusList.sort((ns1, ns2) -> ns1.getBaseStationCode().compareTo(ns2.getBaseStationCode()));
-        locatorStatusList.forEach(locatorStatus -> {
-          LOG.info(locatorStatus.getBaseAddress());
-          locatorStatus.getTrackers().forEach((trackerAddress, trackerStatus) -> {
+        final List<NodeStatus> nodeStatusList = nodeService.getNodeStatusMap().stream().collect(Collectors.toList());
+        nodeStatusList.sort((ns1, ns2) -> ns1.getBaseStationCode().compareTo(ns2.getBaseStationCode()));
+        nodeStatusList.forEach(nodeStatus -> {
+          LOG.info(nodeStatus.getBaseAddress());
+          nodeStatus.getTrackers().forEach((trackerAddress, trackerStatus) -> {
             if(Instant.now().minusSeconds(30).isBefore(trackerStatus.getTimestamp())) {
               LOG.info(String.format("    CA: %s, RSSI: %s, TS: %s, BATT: %s",
                 trackerStatus.getCardAddress(),
@@ -92,10 +99,26 @@ public class NodeRoutes extends FatJarRouter {
       })
       .end();
 
+    from("timer:status?fixedRate=true&period=30000")
+      .routeId("status")
+      .bean(health, "invoke")
+      .log("/health : ${body}")
+      .bean(metrics, "invoke")
+      .log("/metrics : ${body}")
+      .bean(info, "invoke")
+      .log("/info : ${body}")
+      .bean(environmentEndpoint, "invoke")
+      .log("/environment : ${body}")
+      .bean(beansEndpoint, "invoke")
+      .log("/beans : ${body}")
+//      .bean(dumpEndpoint, "invoke")
+//      .log("/dump : ${body}")
+    .end();
+
     from("websocket://trackers")
       .routeId("trackers")
       .onException(Exception.class)
-        .process(exchange -> LOG.error("Error in trackers endpoint",
+        .process(exchange -> LOG.error("Error in " + exchange.getFromEndpoint().getEndpointUri(),
           exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
         .handled(true)
       .end()
@@ -105,16 +128,17 @@ public class NodeRoutes extends FatJarRouter {
       .to("websocket://trackers")
     .end();
 
-    from("websocket://locators")
-      .routeId("locators")
+    from("websocket://nodes")
+      .routeId("nodes")
       .onException(Exception.class)
-        .process(exchange -> LOG.error("Error in locators endpoint",
+        .process(exchange -> LOG.error("Error in " + exchange.getFromEndpoint().getEndpointUri(),
           exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
         .handled(true)
       .end()
-      .process(exchange -> exchange.getIn().setBody(locatorService.getLocatorStatuses()))
+      .process(exchange -> exchange.getIn().setBody(nodeService.getNodeStatusMap()))
       .marshal().json(JsonLibrary.Jackson, Set.class)
       .log("${body}")
-      .to("websocket://locators")
+      .to("websocket://nodes")
     .end();
-  }}
+  }
+}

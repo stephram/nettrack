@@ -18,14 +18,14 @@ public class TrackerService {
     private static final Logger LOG = LoggerFactory.getLogger(TrackerService.class);
 
     @Autowired
-    private LocatorService locatorService;
+    private NodeService nodeService;
 
     private Map<String, TrackerStatus> trackerStatuses = new HashMap<>();
 
     public void process(TrackerStatus trackerStatus) {
         trackerStatuses.put(trackerStatus.getCardAddress(), trackerStatus);
 
-        locatorService.trackerUpdate(trackerStatus);
+        nodeService.trackerUpdate(trackerStatus);
     }
 
     public Set<TrackerStatus> getTrackerStatuses() {
