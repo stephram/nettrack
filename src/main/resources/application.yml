@@ -23,6 +23,7 @@ camel:
   springboot:
     allow-use-original-message: false
     shutdown-timeout: 15
+    main-run-controller: true
 
 #logging:
 #  level: debug

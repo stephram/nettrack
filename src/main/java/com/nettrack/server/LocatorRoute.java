@@ -17,11 +17,12 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.actuate.endpoint.InfoEndpoint;
 import org.springframework.boot.actuate.endpoint.MetricsEndpoint;
+import org.springframework.stereotype.Component;
 
 /**
  * Created by sg on 26/12/16.
  */
-//@Component
+@Component
 public class LocatorRoute extends RouteBuilder {
     private static final Logger LOG = LoggerFactory.getLogger(LocatorRoute.class);
 
@@ -46,7 +47,8 @@ public class LocatorRoute extends RouteBuilder {
 
     @Override
     public void configure() throws Exception {
-        from("netty:tcp://0.0.0.0:8080?sync=false&allowDefaultCodec=false&encoder=#stringEncoder&decoder=#stringDecoder")
+//        from("netty:tcp://0.0.0.0:8080?sync=false&allowDefaultCodec=false&encoder=#stringEncoder&decoder=#stringDecoder")
+        from("netty:tcp://0.0.0.0:8081?sync=false&allowDefaultCodec=false")
             .routeId("locatorRoute")
             .onException(Exception.class)
                 .process(exchange -> LOG.error("Error while receiving Locator message.",
