@@ -194,7 +194,7 @@
                 <artifactId>spring-boot-maven-plugin</artifactId>
                 <version>${spring.boot-version}</version>
                 <configuration>
-                    <mainClass>com.nettrack.server.LocatorApplication</mainClass>
+                    <mainClass>com.nettrack.server.NodeRoutes</mainClass>
                     <layout>JAR</layout>
                 </configuration>
                 <executions>

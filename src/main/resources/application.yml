@@ -15,7 +15,6 @@
 ## limitations under the License.
 ## ------------------------------------------------------------------------
 
-spring.main.sources: com.nettrack.server.LocatorApplication
 #shell.auth.simple.user.name: camel
 #shell.auth.simple.user.password: password
 
@@ -24,6 +23,10 @@ camel:
     allow-use-original-message: false
     shutdown-timeout: 15
     main-run-controller: true
+
+spring:
+  main:
+    sources: com.nettrack.server.NodeRoutes
 
 #logging:
 #  level: debug

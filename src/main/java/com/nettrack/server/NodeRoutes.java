@@ -1,0 +1,120 @@
+package com.nettrack.server;
+
+import com.nettrack.model.LocatorStatus;
+import com.nettrack.model.TrackerStatus;
+import org.apache.camel.Exchange;
+import org.apache.camel.component.websocket.WebsocketConstants;
+import org.apache.camel.model.dataformat.JsonLibrary;
+import org.apache.camel.spring.boot.FatJarRouter;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.actuate.endpoint.InfoEndpoint;
+import org.springframework.boot.actuate.endpoint.MetricsEndpoint;
+import org.springframework.boot.autoconfigure.SpringBootApplication;
+
+import java.time.Instant;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
+
+/**
+ * Created by sg on 12-Mar-17.
+ */
+@SpringBootApplication
+public class NodeRoutes extends FatJarRouter {
+  private static final Logger LOG = LoggerFactory.getLogger(NodeRoutes.class);
+
+  @Autowired
+  private HealthEndpoint health;
+
+  @Autowired
+  private MetricsEndpoint metrics;
+
+  @Autowired
+  private LocatorService locatorService;
+
+  @Autowired
+  private TrackerService trackerService;
+
+  @Autowired
+  private InfoEndpoint info;
+
+  @Override
+  public void configure() throws Exception {
+    //from("netty:tcp://0.0.0.0:8081?sync=false&allowDefaultCodec=false&encoder=#stringEncoder&decoder=#stringDecoder")
+    from("netty:tcp://0.0.0.0:8081?sync=false&allowDefaultCodec=false")
+      .routeId("locatorRoute")
+      .onException(Exception.class)
+      .process(exchange -> LOG.error("Error while receiving Locator message.",
+        exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
+      .handled(true)
+      .end()
+      .choice()
+        .when(bodyAs(String.class).startsWith("{\"BA\""))
+          .unmarshal().json(JsonLibrary.Jackson, LocatorStatus.class)
+          .to("bean:locatorService")
+          .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
+          .process(exchange -> exchange.getIn().setBody(locatorService.getLocatorStatuses()))
+          .marshal().json(JsonLibrary.Jackson, Set.class)
+          .to("websocket://locators")
+        .when(bodyAs(String.class).startsWith("{\"CA\""))
+          .unmarshal().json(JsonLibrary.Jackson, TrackerStatus.class)
+          .to("bean:trackerService")
+          .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
+          .process(exchange -> exchange.getIn().setBody(trackerService.getTrackerStatuses()))
+          .marshal().json(JsonLibrary.Jackson, Set.class)
+          .to("websocket://trackers")
+        .otherwise()
+          .log("Unhandled message: ${body}")
+        .endChoice()
+      .end();
+
+    from("timer:status")
+      .routeId("endpoints")
+      .process(exchange -> {
+        LOG.info("");
+        final List<LocatorStatus> locatorStatusList = locatorService.getLocatorStatuses().stream().collect(Collectors.toList());
+        locatorStatusList.sort((ns1, ns2) -> ns1.getBaseStationCode().compareTo(ns2.getBaseStationCode()));
+        locatorStatusList.forEach(locatorStatus -> {
+          LOG.info(locatorStatus.getBaseAddress());
+          locatorStatus.getTrackers().forEach((trackerAddress, trackerStatus) -> {
+            if(Instant.now().minusSeconds(30).isBefore(trackerStatus.getTimestamp())) {
+              LOG.info(String.format("    CA: %s, RSSI: %s, TS: %s, BATT: %s",
+                trackerStatus.getCardAddress(),
+                trackerStatus.getSignalStrength(),
+                trackerStatus.getTimestamp(),
+                trackerStatus.getBatteryPercentage()));
+            }
+          });
+        });
+      })
+      .end();
+
+    from("websocket://trackers")
+      .routeId("trackers")
+      .onException(Exception.class)
+        .process(exchange -> LOG.error("Error in trackers endpoint",
+          exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
+        .handled(true)
+      .end()
+      .process(exchange -> exchange.getIn().setBody(trackerService.getTrackerStatuses()))
+      .marshal().json(JsonLibrary.Jackson, Set.class)
+      .log("${body}")
+      .to("websocket://trackers")
+    .end();
+
+    from("websocket://locators")
+      .routeId("locators")
+      .onException(Exception.class)
+        .process(exchange -> LOG.error("Error in locators endpoint",
+          exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
+        .handled(true)
+      .end()
+      .process(exchange -> exchange.getIn().setBody(locatorService.getLocatorStatuses()))
+      .marshal().json(JsonLibrary.Jackson, Set.class)
+      .log("${body}")
+      .to("websocket://locators")
+    .end();
+  }}
