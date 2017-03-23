@@ -2,20 +2,26 @@ package com.nettrack.server;
 
 import com.nettrack.model.NodeStatus;
 import com.nettrack.model.TrackerStatus;
+import java.time.Instant;
+import java.util.Comparator;
+import java.util.List;
+import java.util.Set;
+import java.util.stream.Collectors;
 import org.apache.camel.Exchange;
 import org.apache.camel.component.websocket.WebsocketConstants;
 import org.apache.camel.model.dataformat.JsonLibrary;
 import org.apache.camel.spring.boot.FatJarRouter;
+import org.jboss.netty.handler.codec.string.StringDecoder;
+import org.jboss.netty.handler.codec.string.StringEncoder;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.actuate.endpoint.*;
+import org.springframework.boot.actuate.endpoint.BeansEndpoint;
+import org.springframework.boot.actuate.endpoint.EnvironmentEndpoint;
+import org.springframework.boot.actuate.endpoint.HealthEndpoint;
+import org.springframework.boot.actuate.endpoint.InfoEndpoint;
+import org.springframework.boot.actuate.endpoint.MetricsEndpoint;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
-
-import java.time.Instant;
-import java.util.List;
-import java.util.Set;
-import java.util.stream.Collectors;
 
 /**
  * Created by sg on 12-Mar-17.
@@ -39,8 +45,8 @@ public class NodeRoutes extends FatJarRouter {
   @Autowired
   private BeansEndpoint beansEndpoint;
 
-  @Autowired
-  private DumpEndpoint dumpEndpoint;
+//  @Autowired
+//  private DumpEndpoint dumpEndpoint;
 
   @Autowired
   private NodeService nodeService;
@@ -48,11 +54,15 @@ public class NodeRoutes extends FatJarRouter {
   @Autowired
   private TrackerService trackerService;
 
+  private StringDecoder stringDecoder = new StringDecoder();
+
+  private StringEncoder stringEncoder = new StringEncoder();
+
   @Override
   public void configure() throws Exception {
-    //from("netty:tcp://0.0.0.0:8081?sync=false&allowDefaultCodec=false&encoder=#stringEncoder&decoder=#stringDecoder")
-    from("netty:tcp://0.0.0.0:8081?sync=false&allowDefaultCodec=false")
-      .routeId("locatorRoute")
+//    from("netty:tcp://0.0.0.0:8081?sync=false&allowDefaultCodec=false&encoder=#stringEncoder&decoder=#stringDecoder")
+    from("netty:tcp://0.0.0.0:6266?sync=false&allowDefaultCodec=false")
+      .routeId("nodesRoute")
       .onException(Exception.class)
         .process(exchange -> LOG.error("Error while receiving Locator message.",
           exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
@@ -61,7 +71,7 @@ public class NodeRoutes extends FatJarRouter {
       .choice()
         .when(bodyAs(String.class).startsWith("{\"BA\""))
           .unmarshal().json(JsonLibrary.Jackson, NodeStatus.class)
-          .to("bean:locatorService")
+          .to("bean:nodeService")
           .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
           .process(exchange -> exchange.getIn().setBody(nodeService.getNodeStatusMap()))
           .marshal().json(JsonLibrary.Jackson, Set.class)
@@ -82,8 +92,11 @@ public class NodeRoutes extends FatJarRouter {
       .routeId("nodeStatus")
       .process(exchange -> {
         LOG.info("");
+
         final List<NodeStatus> nodeStatusList = nodeService.getNodeStatusMap().stream().collect(Collectors.toList());
-        nodeStatusList.sort((ns1, ns2) -> ns1.getBaseStationCode().compareTo(ns2.getBaseStationCode()));
+        nodeStatusList.sort(Comparator.comparing((NodeStatus ns1) -> ns1.getBaseStationCode())
+            .thenComparing(ns2 -> ns2.getBaseStationCode()));
+
         nodeStatusList.forEach(nodeStatus -> {
           LOG.info(nodeStatus.getBaseAddress());
           nodeStatus.getTrackers().forEach((trackerAddress, trackerStatus) -> {
@@ -101,18 +114,12 @@ public class NodeRoutes extends FatJarRouter {
 
     from("timer:status?fixedRate=true&period=30000")
       .routeId("status")
-      .bean(health, "invoke")
-      .log("/health : ${body}")
-      .bean(metrics, "invoke")
-      .log("/metrics : ${body}")
-      .bean(info, "invoke")
-      .log("/info : ${body}")
-      .bean(environmentEndpoint, "invoke")
-      .log("/environment : ${body}")
-      .bean(beansEndpoint, "invoke")
-      .log("/beans : ${body}")
-//      .bean(dumpEndpoint, "invoke")
-//      .log("/dump : ${body}")
+      .bean(health, "invoke").log("/health : ${body}")
+      .bean(metrics, "invoke").log("/metrics : ${body}")
+      .bean(info, "invoke").log("/info : ${body}")
+      .bean(environmentEndpoint, "invoke").log("/environment : ${body}")
+      .bean(beansEndpoint, "invoke").log("/beans : ${body}")
+//      .bean(dumpEndpoint, "invoke").log("/dump : ${body}")
     .end();
 
     from("websocket://trackers")
