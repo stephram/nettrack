@@ -22,6 +22,10 @@ public class TrackerService {
 
     private Map<String, TrackerStatus> trackerStatuses = new HashMap<>();
 
+    public TrackerService() {
+        LOG.info(toString());
+    }
+
     public void process(TrackerStatus trackerStatus) {
         trackerStatuses.put(trackerStatus.getCardAddress(), trackerStatus);
 

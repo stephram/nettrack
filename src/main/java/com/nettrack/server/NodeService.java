@@ -2,12 +2,11 @@ package com.nettrack.server;
 
 import com.nettrack.model.NodeStatus;
 import com.nettrack.model.TrackerStatus;
-import java.util.HashMap;
-import java.util.Map;
 import java.util.Set;
 import java.util.stream.Collectors;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.stereotype.Service;
 
 /**
@@ -17,21 +16,28 @@ import org.springframework.stereotype.Service;
 public class NodeService {
     private static final Logger LOG = LoggerFactory.getLogger(NodeService.class);
 
-    private Map<String, NodeStatus> NodeStatusMap = new HashMap<>();
+    @Autowired
+    private NodeStates nodeStates;
+
+    public NodeService() {
+        LOG.info(toString());
+    }
 
     public void process(NodeStatus nodeStatus) {
-        NodeStatusMap.put(nodeStatus.getBaseAddress(), nodeStatus);
+        nodeStates.updateNodeState(nodeStatus);
     }
 
     public void trackerUpdate(TrackerStatus trackerStatus) {
-        final NodeStatus nodeStatus = NodeStatusMap.get(trackerStatus.getBaseAddress());
+        final NodeStatus nodeStatus = nodeStates.getNodeStates().get(trackerStatus.getBaseAddress());
         if(nodeStatus != null) {
             nodeStatus.addTracker(trackerStatus);
         }
+        else {
+            LOG.error("Missing: " + trackerStatus.getBaseAddress());
+        }
     }
 
-
-    public Set<NodeStatus> getNodeStatusMap() {
-        return NodeStatusMap.values().stream().collect(Collectors.toSet());
+    public Set<NodeStatus> getNodeStates() {
+        return nodeStates.getNodeStates().values().stream().collect(Collectors.toSet());
     }
 }
