@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <title>Nettrack Charting</title>
+
+      <link rel="stylesheet" type="text/css" href="http://dc-js.github.io/dc.js/css/dc.css"/>
+        <script type="text/javascript" src="http://dc-js.github.io/dc.js/js/d3.js"></script>
+        <script type="text/javascript" src="http://dc-js.github.io/dc.js/js/crossfilter.js"></script>
+        <script type="text/javascript" src="http://dc-js.github.io/dc.js/js/dc.js"></script>
+</head>
+<body>
+<div id="chart-row-nodes"></div>
+
+<script type="text/javascript">
+    var nodesRowChart = dc.rowChart("#chart-row-nodes");
+
+    var nodes = [{BA: '', BATT: '', CA: '', INTV: '', RSSI: '', SN: '', SOS: ''}];
+
+    var connection = new WebSocket('ws://localhost:9292/nodes');
+    connection.binaryType = "blob";
+    connection.addEventListener('message', function(event) {
+        reader = new FileReader();
+        reader.onload = function(event) {
+            nodes = JSON.parse(event.target.result);
+            render_plots(true);
+        };
+        reader.readAsBinaryString(event.data);
+    });
+
+    var nfilter = crossfilter(nodes);
+
+    function render_plots(redraw) {
+        nfilter = crossfilter(nodes);
+
+        var nodeBA = nfilter.dimension(function(d) {return d.BA; }),
+            nodeCA = nfilter.dimension(function(d) {return d.CA; }),
+            nodeSS = nfilter.dimension(function(d) {return d.RSSI; }),
+            nodeSN = nfilter.dimension(function(d) {return d.SN; }),
+            nodeLC = nodeCA.group().reduceSum(function(d) { return Math.abs(100 - cleanInt(d.RSSI)); });
+
+        nodesRowChart
+            .width(400).height(200)
+            .dimension(nodeCA)
+            .group(nodeLC)
+            .elasticX(true);
+
+        if (redraw) {
+            dc.redrawAll()
+        } else { 
+            dc.renderAll();
+        }
+    }
+    render_plots(false);
+
+    // data reset function (adapted)
+    function resetData(ndx, dimensions) {
+        nfilter.remove()
+        // var yearChartFilters = yearRingChart.filters();
+        // var spenderChartFilters = spenderRowChart.filters();
+        // yearRingChart.filter(null);
+        // spenderRowChart.filter(null);
+        // xfilter.remove();
+        // yearRingChart.filter([yearChartFilters]);
+        // spenderRowChart.filter([spenderChartFilters]);
+    }
+
+    function cleanInt(x) {
+        x = Number(x);
+        return x >= 0 ? Math.floor(x) : Math.ceil(x);
+    }
+
+    connection.onopen = function(event) {
+        console.log("OnOpen: ", event);
+    }
+    connection.onerror = function(event) {
+        console.log("OnError: ", event);
+    }
+    connection.onclose = function(event) {
+        console.log('onclose', event);
+    }
+</script>
+</body>
+</html>
