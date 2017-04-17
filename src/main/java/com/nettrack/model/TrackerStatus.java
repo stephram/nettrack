@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
-import java.time.Instant;
+import java.util.Date;
 
 /**
  * Created by sg on 26/12/16.
@@ -19,10 +19,10 @@ public class TrackerStatus implements Serializable {
     private String signalStrength;
     private String broadcastInterval;
     private String packetNumber;
-    private Instant timestamp;
+    private Date timestamp;
 
     public TrackerStatus() {
-        this.timestamp = Instant.now();
+        this.timestamp = new Date();
     }
 
     @JsonProperty("CA")
@@ -89,7 +89,7 @@ public class TrackerStatus implements Serializable {
     }
 
     @JsonProperty("timestamp")
-    public Instant getTimestamp() {
+    public Date getTimestamp() {
         return timestamp;
     }
 

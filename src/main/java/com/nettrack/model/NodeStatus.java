@@ -4,8 +4,8 @@ import com.fasterxml.jackson.annotation.JsonIgnoreProperties;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import com.fasterxml.jackson.annotation.JsonProperty;
 import java.io.Serializable;
-import java.time.Instant;
 import java.util.Collections;
+import java.util.Date;
 import java.util.HashMap;
 import java.util.Map;
 
@@ -20,13 +20,15 @@ public class NodeStatus implements Serializable {
     private String heartBeatRate;
     private String baseStationCode;
     private String baseStationFirmware;
-    private Instant timestamp;
+//    private Instant timestamp;
+    private Date timestamp;
 
     private Map<String, TrackerStatus> trackerStatuses = new HashMap<>();
 
 
     public NodeStatus() {
-        this.timestamp = Instant.now();
+        //this.timestamp = Instant.now();
+        timestamp = new Date(); //LocalDateTime.now();
     }
 
     public void addTracker(TrackerStatus trackerStatus) {
@@ -83,7 +85,7 @@ public class NodeStatus implements Serializable {
     }
 
     @JsonProperty("timestamp")
-    public Instant getTimestamp() {
+    public Date getTimestamp() {
         return timestamp;
     }
 

@@ -20,9 +20,10 @@
     var connection = new WebSocket('ws://localhost:9292/nodes');
     connection.binaryType = "blob";
     connection.addEventListener('message', function(event) {
-        reader = new FileReader();
+        var reader = new FileReader();
         reader.onload = function(event) {
             nodes = JSON.parse(event.target.result);
+            console.log(Date.now() + ' ' + nodes[0].BA, nodes);
             render_plots(true);
         };
         reader.readAsBinaryString(event.data);
