@@ -1,41 +1,35 @@
 package com.nettrack.server;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
-import com.nettrack.common.utils.JsonMapperFactory;
 import com.nettrack.model.NodeStatus;
 import com.nettrack.model.TrackerStatus;
 import java.util.Comparator;
 import java.util.List;
 import java.util.Set;
 import java.util.stream.Collectors;
-import javax.jms.ConnectionFactory;
-import org.apache.activemq.ActiveMQConnectionFactory;
-import org.apache.activemq.camel.component.ActiveMQComponent;
 import org.apache.camel.Exchange;
-import org.apache.camel.component.jms.JmsConfiguration;
+import org.apache.camel.builder.RouteBuilder;
 import org.apache.camel.component.websocket.WebsocketConstants;
 import org.apache.camel.model.dataformat.JsonLibrary;
-import org.apache.camel.spring.boot.FatJarRouter;
-import org.apache.camel.spring.spi.SpringTransactionPolicy;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.actuate.endpoint.BeansEndpoint;
+import org.springframework.boot.actuate.endpoint.DumpEndpoint;
 import org.springframework.boot.actuate.endpoint.EnvironmentEndpoint;
 import org.springframework.boot.actuate.endpoint.HealthEndpoint;
 import org.springframework.boot.actuate.endpoint.InfoEndpoint;
 import org.springframework.boot.actuate.endpoint.MetricsEndpoint;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.context.annotation.Bean;
-import org.springframework.context.annotation.DependsOn;
-import org.springframework.jms.connection.JmsTransactionManager;
+import org.springframework.stereotype.Component;
 
 /**
  * Created by sg on 12-Mar-17.
  */
-@SpringBootApplication
-public class NodeRoutes extends FatJarRouter {
+@Component
+public class NodeRoutes extends RouteBuilder {
+
   private static final Logger LOG = LoggerFactory.getLogger(NodeRoutes.class);
 
   @Autowired
@@ -53,11 +47,12 @@ public class NodeRoutes extends FatJarRouter {
   @Autowired
   private BeansEndpoint beansEndpoint;
 
-//  @Autowired
-//  private DumpEndpoint dumpEndpoint;
+  @Autowired
+  private DumpEndpoint dumpEndpoint;
 
-//  @Autowired
-  private ObjectMapper objectMapper = JsonMapperFactory.objectMapperUnquotedFieldNames();
+  @Autowired
+  @Qualifier("objectMapperUnquotedFieldNames")
+  private ObjectMapper objectMapper;
 
   @Autowired
   private NodeService nodeService;
@@ -65,41 +60,41 @@ public class NodeRoutes extends FatJarRouter {
   @Autowired
   private TrackerService trackerService;
 
-  @Value("${activemq.broker.url}")
-  private String activemqBrokerUrl = "tcp://localhost:61616";
+  @Value("${nodeRoutes.listener}")
+  private String nodeListenerRouteUri;
 
   @Override
   public void configure() throws Exception {
 
-    from("netty:tcp://0.0.0.0:6266?sync=false&allowDefaultCodec=false")
-        .routeId("nodesRoute")
-        .onException(Exception.class)
-        .process(exchange -> LOG.error("Error while receiving Locator message.",
-            exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
-        .handled(true)
-        .end()
-        .choice()
-        .when(bodyAs(String.class).startsWith("{\"BA\""))
-          .unmarshal().json(JsonLibrary.Jackson, NodeStatus.class)
-          .to("bean:nodeService")
+  from(nodeListenerRouteUri)
+    .routeId("nodesRoute")
+    .onException(Exception.class)
+    .process(exchange -> LOG.error("Error while receiving Locator message.",
+        exchange.getProperty(Exchange.EXCEPTION_CAUGHT, Exception.class)))
+    .handled(true)
+    .end()
+    .choice()
+    .when(bodyAs(String.class).startsWith("{\"BA\""))
+      .unmarshal().json(JsonLibrary.Jackson, NodeStatus.class)
+      .to("bean:nodeService")
 //          .process(exchange -> logNodeStatus())
 //          .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
-          .process(exchange -> exchange.getIn().setBody(nodeService.getNodeStates()))
+      .process(exchange -> exchange.getIn().setBody(nodeService.getNodeStates()))
 //          .marshal().json(JsonLibrary.Jackson, Set.class)
 //          .log(body().toString())
 //          .to("websocket://nodes")
-        .when(bodyAs(String.class).startsWith("{\"CA\""))
-          .unmarshal().json(JsonLibrary.Jackson, TrackerStatus.class)
-          .to("bean:trackerService")
+    .when(bodyAs(String.class).startsWith("{\"CA\""))
+      .unmarshal().json(JsonLibrary.Jackson, TrackerStatus.class)
+      .to("bean:trackerService")
 //          .process(exchange -> logNodeStatus())
-          .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
-          .process(exchange -> exchange.getIn().setBody(trackerService.getTrackerStatuses()))
-          .marshal().json(JsonLibrary.Jackson, Set.class)
-          .to("direct:multicaster")
-        .otherwise()
-          .log("Unhandled message: ${body}")
-        .endChoice()
-        .end();
+      .setHeader(WebsocketConstants.SEND_TO_ALL, constant(true))
+      .process(exchange -> exchange.getIn().setBody(trackerService.getTrackerStatuses()))
+      .marshal().json(JsonLibrary.Jackson, Set.class)
+      .to("direct:multicaster")
+    .otherwise()
+      .log("Unhandled message: ${body}")
+    .endChoice()
+  .end();
 
 //    from("websocket://trackers")
 //      .routeId("trackers")
@@ -157,44 +152,6 @@ public class NodeRoutes extends FatJarRouter {
 //      .bean(beansEndpoint, "invoke").log("/beans : ${body}")
 ////      .bean(dumpEndpoint, "invoke").log("/dump : ${body}")
 //    .end();
-  }
-
-  @Bean(name = "activeMq")
-  public ActiveMQComponent activeMq() {
-    ActiveMQComponent activeMQComponent = new ActiveMQComponent();
-    activeMQComponent.setConnectionFactory(activeMqConnectionFactory());
-    return activeMQComponent;
-  }
-
-  @Bean(name = "activeMqConnectionFactory")
-  public ConnectionFactory activeMqConnectionFactory() {
-    return new ActiveMQConnectionFactory(activemqBrokerUrl);
-  }
-
-  @Bean(name = "jmsConfig")
-  @DependsOn(value = { "activeMqConnectionFactory", "jmsTransactionManager" })
-  public JmsConfiguration jmsConfiguration() {
-    JmsConfiguration jmsConfiguration = new JmsConfiguration(activeMqConnectionFactory());
-    jmsConfiguration.setTransacted(true);
-    jmsConfiguration.setTransactionManager(jmsTransactionManager());
-    jmsConfiguration.setCacheLevelName("CACHE_CONNECTION");
-    return jmsConfiguration;
-  }
-
-  @Bean(name = "jmsTransactionManager")
-  @DependsOn(value = { "activeMqConnectionFactory" })
-  public JmsTransactionManager jmsTransactionManager() {
-    JmsTransactionManager transactionManager = new JmsTransactionManager();
-    transactionManager.setConnectionFactory(activeMqConnectionFactory());
-    return transactionManager;
-  }
-
-  @Bean(name = "jmsTransactionPolicy")
-  @DependsOn(value = { "activeMqConnectionFactory" })
-  public SpringTransactionPolicy jmsTransactionPolicy() {
-    SpringTransactionPolicy springTransactionPolicy = new SpringTransactionPolicy();
-    springTransactionPolicy.setTransactionManager(jmsTransactionManager());
-    return springTransactionPolicy;
   }
 
   private void logNodeStatus() {

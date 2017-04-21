@@ -28,6 +28,13 @@ spring:
   main:
     sources: com.nettrack.server.NodeRoutes
 
+activemq:
+  broker:
+    url: tcp://localhost:61616
+
+nodeRoutes:
+  listener: netty:tcp://0.0.0.0:6266?sync=false&allowDefaultCodec=false
+
 #logging:
 #  level: debug
 
