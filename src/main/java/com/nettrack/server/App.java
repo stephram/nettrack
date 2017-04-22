@@ -1,5 +1,6 @@
 package com.nettrack.server;
 
+import org.json.JSONObject;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.boot.SpringApplication;
@@ -16,6 +17,10 @@ public class App {
 
     public static void main(String[] args) {
         final ApplicationContext applicationContext = SpringApplication.run(App.class, args);
-        LOG.info(applicationContext.toString());
+        LOG.info(String.format("Started '%s', Id: '%s'.\nActive profiles: %s\nDefault profiles: %s.",
+            applicationContext.getId(),
+            applicationContext.getDisplayName(),
+            JSONObject.valueToString(applicationContext.getEnvironment().getActiveProfiles()),
+            JSONObject.valueToString(applicationContext.getEnvironment().getDefaultProfiles())));
     }
 }
