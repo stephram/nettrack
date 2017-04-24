@@ -63,6 +63,9 @@ public class NodeRoutes extends RouteBuilder {
   @Value("${nodeRoutes.listener}")
   private String nodeListenerRouteUri;
 
+  @Value("${activemq.reader}")
+  private String messageQueueReader;
+
   @Override
   public void configure() throws Exception {
 
@@ -114,7 +117,7 @@ public class NodeRoutes extends RouteBuilder {
         .to("direct:null")
     .end();
 
-    from("activemq:nettrack:node.nodes?jmsMessageType=Text")
+    from(messageQueueReader)
         .routeId("activemqNodes")
         .unmarshal().json(JsonLibrary.Jackson, Set.class)
         .split(body())

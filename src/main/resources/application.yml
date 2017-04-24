@@ -29,6 +29,7 @@ spring:
     sources: com.nettrack.server.NodeRoutes
 
 activemq:
+  reader: activemq:nettrack:node.nodes?jmsMessageType=Text
   broker:
     url: tcp://localhost:61616
 
